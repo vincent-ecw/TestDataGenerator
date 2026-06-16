@@ -1,0 +1,95 @@
+<sw-page class="test-data-generator-index">
+    <template #smart-bar-header>
+        <h2>{{ $tc('test-data-generator.general.title') }}</h2>
+    </template>
+
+    <template #content>
+        <sw-card-view>
+            <!-- Warning if API Key is not configured -->
+            <sw-alert v-if="!isConfigured" variant="warning" class="config-alert">
+                {{ $tc('test-data-generator.general.apiConfigError') }}
+            </sw-alert>
+
+            <sw-card position-identifier="test-data-generator-config" :title="$tc('test-data-generator.general.subtitle')">
+                <div class="test-data-generator-form">
+                    <sw-switch-field
+                        v-model:value="createTranslationsOnly"
+                        :label="$tc('test-data-generator.general.createTranslationsOnlyLabel')"
+                    />
+
+                    <template v-if="!createTranslationsOnly">
+                        <sw-switch-field
+                            v-if="isDev"
+                            v-model:value="deleteTestDataBeforeGeneration"
+                            :label="$tc('test-data-generator.general.deleteTestDataBeforeGenerationLabel')"
+                        />
+
+                        <sw-switch-field
+                            v-model:value="useExistingCategories"
+                            :label="$tc('test-data-generator.general.useExistingCategoriesLabel')"
+                        />
+
+                        <sw-category-tree-field
+                            v-if="useExistingCategories"
+                            :categories-collection="categoryCollection"
+                            single-select
+                            :placeholder="$tc('test-data-generator.general.placeholderCategory')"
+                            @selection-add="onCategorySelected"
+                            @selection-remove="onCategoryRemoved"
+                        />
+
+                        <sw-number-field
+                            v-if="!useExistingCategories"
+                            v-model:value="categoriesCount"
+                            :label="$tc('test-data-generator.general.categoriesCountLabel')"
+                            :min="1"
+                            :max="20"
+                            required
+                        />
+
+                        <sw-number-field
+                            v-model:value="productsCount"
+                            :label="$tc('test-data-generator.general.productsCountLabel')"
+                            :min="1"
+                            :max="500"
+                            required
+                        />
+
+                        <sw-switch-field
+                            v-model:value="generateImages"
+                            :label="$tc('test-data-generator.general.generateImagesLabel')"
+                        />
+
+                        <sw-switch-field
+                            v-model:value="generateReviews"
+                            :label="$tc('test-data-generator.general.generateReviewsLabel')"
+                        />
+                    </template>
+
+                    <div class="generator-actions">
+                        <sw-button
+                            variant="primary"
+                            :disabled="isLoading || !isConfigured"
+                            @click="onGenerate"
+                        >
+                            <span v-if="status === 'running'">{{ $tc('test-data-generator.general.generatingButton') }}</span>
+                            <span v-else>{{ $tc('test-data-generator.general.generateButton') }}</span>
+                        </sw-button>
+                    </div>
+                </div>
+            </sw-card>
+
+            <!-- Status card -->
+            <sw-card position-identifier="test-data-generator-status" :title="$tc('test-data-generator.general.statusTitle')">
+                <div class="status-container" :class="statusClass">
+                    <div class="status-indicator">
+                        <span class="indicator-dot"></span>
+                    </div>
+                    <div class="status-content">
+                        <p class="status-text">{{ statusText }}</p>
+                    </div>
+                </div>
+            </sw-card>
+        </sw-card-view>
+    </template>
+</sw-page>
