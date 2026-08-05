@@ -21,7 +21,7 @@ class GeminiClient
         $apiKey = (string) $this->systemConfig->get('TestDataGenerator.config.apiKey');
         $model = (string) $this->systemConfig->get('TestDataGenerator.config.llmVersion');
         if (empty($model)) {
-            $model = 'gemini-3.5-flash';
+            $model = 'gemini-3.5-flash-lite';
         }
 
         if (empty($apiKey)) {
@@ -82,7 +82,7 @@ class GeminiClient
             throw new \Exception('Gemini API Key is not configured.');
         }
 
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent';
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-image:generateContent';
 
         $payload = [
             'contents' => [

@@ -34,7 +34,10 @@ class GenerateTestDataHandler
                 $context,
                 $message->getSelectedCategoryId(),
                 $message->isDeleteTestDataBeforeGeneration(),
-                $message->isGenerateReviews()
+                $message->isGenerateReviews(),
+                $message->isGenerateManufacturers(),
+                $message->getManufacturersCount(),
+                $message->getManufacturersBranch()
             );
 
             $this->systemConfigService->set('TestDataGenerator.config.status', 'success');

@@ -14,6 +14,9 @@ class GenerateTestDataMessage implements AsyncMessageInterface
     private ?string $selectedCategoryId;
     private bool $deleteTestDataBeforeGeneration;
     private bool $generateReviews;
+    private bool $generateManufacturers;
+    private int $manufacturersCount;
+    private ?string $manufacturersBranch;
 
     public function __construct(
         int $categoriesCount,
@@ -23,7 +26,10 @@ class GenerateTestDataMessage implements AsyncMessageInterface
         bool $createTranslationsOnly = false,
         ?string $selectedCategoryId = null,
         bool $deleteTestDataBeforeGeneration = false,
-        bool $generateReviews = false
+        bool $generateReviews = false,
+        bool $generateManufacturers = false,
+        int $manufacturersCount = 5,
+        ?string $manufacturersBranch = null
     ) {
         $this->categoriesCount = $categoriesCount;
         $this->productsCount = $productsCount;
@@ -33,6 +39,9 @@ class GenerateTestDataMessage implements AsyncMessageInterface
         $this->selectedCategoryId = $selectedCategoryId;
         $this->deleteTestDataBeforeGeneration = $deleteTestDataBeforeGeneration;
         $this->generateReviews = $generateReviews;
+        $this->generateManufacturers = $generateManufacturers;
+        $this->manufacturersCount = $manufacturersCount;
+        $this->manufacturersBranch = $manufacturersBranch;
     }
 
     public function getCategoriesCount(): int
@@ -73,5 +82,20 @@ class GenerateTestDataMessage implements AsyncMessageInterface
     public function isGenerateReviews(): bool
     {
         return $this->generateReviews;
+    }
+
+    public function isGenerateManufacturers(): bool
+    {
+        return $this->generateManufacturers;
+    }
+
+    public function getManufacturersCount(): int
+    {
+        return $this->manufacturersCount;
+    }
+
+    public function getManufacturersBranch(): ?string
+    {
+        return $this->manufacturersBranch;
     }
 }

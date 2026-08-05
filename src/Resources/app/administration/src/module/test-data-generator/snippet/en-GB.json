@@ -22,7 +22,11 @@
             "toastError": "Error starting generation: {error}",
             "placeholderCategory": "Select a category to limit product generation to its children (optional)...",
             "deleteTestDataBeforeGenerationLabel": "Delete all products and product properties before generation (DEV only)",
-            "generateReviewsLabel": "Add reviews for products"
+            "generateReviewsLabel": "Add reviews for products",
+            "generateManufacturersLabel": "Generate Manufacturers / Brands",
+            "manufacturersCountLabel": "Number of Manufacturers / Brands",
+            "manufacturersBranchLabel": "Branch / Industry",
+            "manufacturersBranchPlaceholder": "e.g. Electronics, Cycling, Outdoor & Sports"
         }
     }
 }

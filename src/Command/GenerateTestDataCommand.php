@@ -26,6 +26,12 @@ class GenerateTestDataCommand extends Command
     protected function configure(): void
     {
         $this->addOption('reviews', 'r', \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Generate product reviews');
+        $this->addOption('manufacturers', 'm', \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Generate manufacturers / brands');
+        $this->addOption('manufacturers-count', null, \Symfony\Component\Console\Input\InputOption::VALUE_OPTIONAL, 'Number of manufacturers to generate', 5);
+        $this->addOption('manufacturers-branch', null, \Symfony\Component\Console\Input\InputOption::VALUE_OPTIONAL, 'Branch / industry for generated manufacturers');
+        $this->addOption('categories-count', null, \Symfony\Component\Console\Input\InputOption::VALUE_OPTIONAL, 'Number of categories to generate', 1);
+        $this->addOption('products-count', null, \Symfony\Component\Console\Input\InputOption::VALUE_OPTIONAL, 'Number of products to generate', 2);
+        $this->addOption('images', 'i', \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Generate product cover images and brand logos');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -34,15 +40,24 @@ class GenerateTestDataCommand extends Command
         $context = Context::createDefaultContext();
         
         $generateReviews = (bool) $input->getOption('reviews');
+        $generateManufacturers = (bool) $input->getOption('manufacturers');
+        $manufacturersCount = (int) $input->getOption('manufacturers-count');
+        $manufacturersBranch = $input->getOption('manufacturers-branch') ? (string) $input->getOption('manufacturers-branch') : null;
+        $categoriesCount = (int) $input->getOption('categories-count');
+        $productsCount = (int) $input->getOption('products-count');
+        $generateImages = (bool) $input->getOption('images');
 
         $this->dataImporter->importData(
-            categoriesCount: 1,
-            productsCount: 2,
-            generateImages: true,
+            categoriesCount: $categoriesCount,
+            productsCount: $productsCount,
+            generateImages: $generateImages,
             useExistingCategories: false,
             createTranslationsOnly: false,
             context: $context,
-            generateReviews: $generateReviews
+            generateReviews: $generateReviews,
+            generateManufacturers: $generateManufacturers,
+            manufacturersCount: $manufacturersCount,
+            manufacturersBranch: $manufacturersBranch
         );
 
         $output->writeln('Finished test data generation!');

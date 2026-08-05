@@ -64,6 +64,27 @@
                             v-model:value="generateReviews"
                             :label="$tc('test-data-generator.general.generateReviewsLabel')"
                         />
+
+                        <sw-switch-field
+                            v-model:value="generateManufacturers"
+                            :label="$tc('test-data-generator.general.generateManufacturersLabel')"
+                        />
+
+                        <template v-if="generateManufacturers">
+                            <sw-number-field
+                                v-model:value="manufacturersCount"
+                                :label="$tc('test-data-generator.general.manufacturersCountLabel')"
+                                :min="1"
+                                :max="100"
+                                required
+                            />
+
+                            <sw-text-field
+                                v-model:value="manufacturersBranch"
+                                :label="$tc('test-data-generator.general.manufacturersBranchLabel')"
+                                :placeholder="$tc('test-data-generator.general.manufacturersBranchPlaceholder')"
+                            />
+                        </template>
                     </template>
 
                     <div class="generator-actions">

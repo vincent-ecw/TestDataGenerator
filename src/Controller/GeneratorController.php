@@ -47,6 +47,9 @@ class GeneratorController extends AbstractController
         $productsCount = isset($data['productsCount']) ? (int) $data['productsCount'] : 20;
         $generateImages = isset($data['generateImages']) ? (bool) $data['generateImages'] : false;
         $generateReviews = isset($data['generateReviews']) ? (bool) $data['generateReviews'] : false;
+        $generateManufacturers = isset($data['generateManufacturers']) ? (bool) $data['generateManufacturers'] : false;
+        $manufacturersCount = isset($data['manufacturersCount']) ? (int) $data['manufacturersCount'] : 5;
+        $manufacturersBranch = isset($data['manufacturersBranch']) && !empty($data['manufacturersBranch']) ? (string) $data['manufacturersBranch'] : null;
         $useExistingCategories = isset($data['useExistingCategories']) ? (bool) $data['useExistingCategories'] : false;
         $createTranslationsOnly = isset($data['createTranslationsOnly']) ? (bool) $data['createTranslationsOnly'] : false;
         $selectedCategoryId = isset($data['selectedCategoryId']) && !empty($data['selectedCategoryId']) ? (string) $data['selectedCategoryId'] : null;
@@ -56,7 +59,7 @@ class GeneratorController extends AbstractController
             $deleteTestDataBeforeGeneration = isset($data['deleteTestDataBeforeGeneration']) ? (bool) $data['deleteTestDataBeforeGeneration'] : false;
         }
 
-        if (!$createTranslationsOnly && ((!$useExistingCategories && $categoriesCount <= 0) || $productsCount <= 0)) {
+        if (!$createTranslationsOnly && !$generateManufacturers && ((!$useExistingCategories && $categoriesCount <= 0) || $productsCount <= 0)) {
             return new JsonResponse(['success' => false, 'message' => 'Invalid count parameters.'], 400);
         }
 
@@ -68,7 +71,10 @@ class GeneratorController extends AbstractController
             $createTranslationsOnly,
             $selectedCategoryId,
             $deleteTestDataBeforeGeneration,
-            $generateReviews
+            $generateReviews,
+            $generateManufacturers,
+            $manufacturersCount,
+            $manufacturersBranch
         ));
 
         return new JsonResponse([

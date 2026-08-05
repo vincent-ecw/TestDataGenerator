@@ -14,6 +14,7 @@ All heavy generation tasks are processed asynchronously via the background messa
 - **Clean Test Environments (DEV only)**: Provides a development-only option to clear all products and property groups from the store before starting generation to keep test environments clean.
 - **Translation-Only Mode**: Scans your database for missing translations on existing categories and products, translates them using Gemini, and saves them without overwriting your existing content.
 - **Product Cover Images**: Optionally generates professional studio product cover images using Google's **gemini-2.5-flash-image** (with automatic pastel GD-generated images as a fallback).
+- **Manufacturer & Brand Generation**: Generates realistic brands relevant to a specified industry/branch with brand names, URLs, translated descriptions, and logo graphics on a crisp white background.
 - **Realistic Product Reviews**: Generates 1–10 reviews per product in matching languages, with varied star ratings (1.0 to 5.0) and randomized dates in the past (1 to 60 days) to test sorting and storefront layouts.
 - **Asynchronous Execution**: Offloads heavy tasks to the Symfony Messenger queue. Users can safely close the administration page while the task executes in the background.
 - **Progress Tracking**: Polls the current task status and displays visual feedback (running, completed, or failed with error logs) directly in the Admin panel.

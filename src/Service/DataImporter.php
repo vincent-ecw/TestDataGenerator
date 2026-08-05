@@ -27,6 +27,7 @@ class DataImporter
     private GeminiClient $geminiClient;
     private LoggerInterface $logger;
     private EntityRepository $productReviewRepository;
+    private EntityRepository $productManufacturerRepository;
     private array $propertyGroupCache = [];
     private array $propertyOptionCache = [];
 
@@ -43,7 +44,8 @@ class DataImporter
         FileSaver $fileSaver,
         GeminiClient $geminiClient,
         LoggerInterface $logger,
-        EntityRepository $productReviewRepository
+        EntityRepository $productReviewRepository,
+        EntityRepository $productManufacturerRepository
     ) {
         $this->categoryRepository = $categoryRepository;
         $this->productRepository = $productRepository;
@@ -58,6 +60,7 @@ class DataImporter
         $this->geminiClient = $geminiClient;
         $this->logger = $logger;
         $this->productReviewRepository = $productReviewRepository;
+        $this->productManufacturerRepository = $productManufacturerRepository;
     }
 
     public function importData(
@@ -69,7 +72,10 @@ class DataImporter
         Context $context,
         ?string $selectedCategoryId = null,
         bool $deleteTestDataBeforeGeneration = false,
-        bool $generateReviews = false
+        bool $generateReviews = false,
+        bool $generateManufacturers = false,
+        int $manufacturersCount = 5,
+        ?string $manufacturersBranch = null
     ): void {
         if ($deleteTestDataBeforeGeneration) {
             $this->deleteTestData($context);
@@ -96,6 +102,13 @@ class DataImporter
             $this->generateMissingTranslations($activeLanguages, $context);
             return;
         }
+
+        // 6. Generate Manufacturers if requested
+        if ($generateManufacturers && $manufacturersCount > 0) {
+            $this->generateManufacturers($manufacturersCount, $manufacturersBranch, $activeLanguages, $mediaFolderId, $context, $generateImages);
+        }
+
+        $availableManufacturerIds = $this->getAvailableManufacturerIds($context);
 
         $categories = [];
         if ($useExistingCategories) {
@@ -416,7 +429,7 @@ class DataImporter
                     $chunkSize,
                     $localesList,
                     $localesList,
-                    $generateReviews ? "\n                    - Generate between 1 and 10 reviews per product under the 'reviews' array. The reviews must have different ratings (points from 1.0 to 5.0) and comments. Reviewer names, titles, and comments must be written in the language matching the specified locale. The 'locale' field of each review MUST be one of the active locales: " . $localesList . "." : ""
+                    $generateReviews ? "\n                    - Generate between 1 and 10 reviews per product under the 'reviews' array. The reviews must cover a diverse range of ratings (points from 0.5 to 5.0 stars, including negative, mixed/neutral, and positive reviews) and comments. Reviewer names, titles, and comments must be written in the language matching the specified locale. The 'locale' field of each review MUST be one of the active locales: " . $localesList . "." : ""
                 );
 
                 $jsonText = $this->geminiClient->generateText($productPrompt, $productSchema);
@@ -440,7 +453,8 @@ class DataImporter
                         $activeLanguages,
                         $defaultLangId,
                         $context,
-                        $generateReviews
+                        $generateReviews,
+                        $availableManufacturerIds
                     );
                     $productIndex++;
                 }
@@ -460,7 +474,8 @@ class DataImporter
         array $activeLanguages,
         ?string $defaultLangId,
         Context $context,
-        bool $generateReviews = false
+        bool $generateReviews = false,
+        array $availableManufacturerIds = []
     ): void {
         // Parse properties and create property groups/options
         $variantOptionsMap = []; // GroupId -> [OptionId -> OptionDbId]
@@ -550,17 +565,23 @@ class DataImporter
             'translations' => $translationsPayload,
             'productNumber' => $productNumber,
             'stock' => (int) ($prodData['stock'] ?? 10),
-            'price' => [[
-                'currencyId' => Defaults::CURRENCY,
-                'gross' => $grossPrice,
-                'net' => $netPrice,
-                'linked' => true,
-            ]],
+            'price' => [
+                [
+                    'currencyId' => Defaults::CURRENCY,
+                    'gross' => $grossPrice,
+                    'net' => $netPrice,
+                    'linked' => true,
+                ]
+            ],
             'taxId' => $taxId,
             'categories' => [['id' => $categoryId]],
             'visibilities' => $visibilities,
             'active' => true,
         ];
+
+        if (!empty($availableManufacturerIds)) {
+            $productPayload['manufacturerId'] = $availableManufacturerIds[array_rand($availableManufacturerIds)];
+        }
 
         if (!empty($defaultName)) {
             $productPayload['name'] = $defaultName;
@@ -645,12 +666,14 @@ class DataImporter
                     'parentId' => $productId,
                     'productNumber' => $variantProductNumber,
                     'stock' => isset($variantData['stock']) ? (int) $variantData['stock'] : (int) ($prodData['stock'] ?? 10),
-                    'price' => [[
-                        'currencyId' => Defaults::CURRENCY,
-                        'gross' => $variantGrossPrice,
-                        'net' => $variantNetPrice,
-                        'linked' => true,
-                    ]],
+                    'price' => [
+                        [
+                            'currencyId' => Defaults::CURRENCY,
+                            'gross' => $variantGrossPrice,
+                            'net' => $variantNetPrice,
+                            'linked' => true,
+                        ]
+                    ],
                     'options' => $variantOptionIds,
                     'active' => true,
                 ];
@@ -686,7 +709,7 @@ class DataImporter
             $reviewerName = $review['reviewerName'] ?? 'Guest';
             $title = $review['title'] ?? 'Review';
             $content = $review['content'] ?? '';
-            $points = isset($review['points']) ? (float)$review['points'] : 5.0;
+            $points = isset($review['points']) ? (float) $review['points'] : 5.0;
             $locale = $review['locale'] ?? '';
 
             $languageId = array_search($locale, $activeLanguages, true);
@@ -814,10 +837,10 @@ class DataImporter
                     }
                 }
 
-                $isMissing = !$translation 
-                    || empty($translation->getName()) 
-                    || empty($translation->getDescription()) 
-                    || empty($translation->getMetaTitle()) 
+                $isMissing = !$translation
+                    || empty($translation->getName())
+                    || empty($translation->getDescription())
+                    || empty($translation->getMetaTitle())
                     || empty($translation->getMetaDescription());
 
                 if ($isMissing) {
@@ -870,10 +893,10 @@ class DataImporter
                     }
                 }
 
-                $isMissing = !$translation 
-                    || empty($translation->getName()) 
-                    || empty($translation->getDescription()) 
-                    || empty($translation->getMetaTitle()) 
+                $isMissing = !$translation
+                    || empty($translation->getName())
+                    || empty($translation->getDescription())
+                    || empty($translation->getMetaTitle())
                     || empty($translation->getMetaDescription());
 
                 if ($isMissing) {
@@ -1020,7 +1043,7 @@ class DataImporter
             $transProperties['description'] = ['type' => 'STRING'];
             $transProperties['metaTitle'] = ['type' => 'STRING'];
             $transProperties['metaDescription'] = ['type' => 'STRING'];
-            
+
             $transRequired[] = 'description';
             $transRequired[] = 'metaTitle';
             $transRequired[] = 'metaDescription';
@@ -1160,7 +1183,7 @@ Items:
         $criteria->addFilter(new EqualsFilter('active', true));
         $criteria->setLimit(1);
         $salesChannel = $this->salesChannelRepository->search($criteria, $context)->first();
-        
+
         return $salesChannel ? $salesChannel->getNavigationCategoryId() : null;
     }
 
@@ -1169,7 +1192,7 @@ Items:
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('active', true));
         $salesChannels = $this->salesChannelRepository->search($criteria, $context);
-        
+
         $visibilities = [];
         foreach ($salesChannels as $salesChannel) {
             $visibilities[] = [
@@ -1196,11 +1219,13 @@ Items:
 
         // Create fallback tax rate
         $taxId = Uuid::randomHex();
-        $this->taxRepository->create([[
-            'id' => $taxId,
-            'name' => 'Standard Tax',
-            'taxRate' => 19.0,
-        ]], $context);
+        $this->taxRepository->create([
+            [
+                'id' => $taxId,
+                'name' => 'Standard Tax',
+                'taxRate' => 19.0,
+            ]
+        ], $context);
 
         return [
             'id' => $taxId,
@@ -1236,7 +1261,7 @@ Items:
         }
 
         $id = Uuid::randomHex();
-        
+
         $translationsPayload = [];
         foreach ($translations as $langId => $trans) {
             $translationsPayload[$langId] = [
@@ -1244,13 +1269,15 @@ Items:
             ];
         }
 
-        $this->propertyGroupRepository->create([[
-            'id' => $id,
-            'translations' => $translationsPayload,
-            'name' => $defaultName,
-            'displayType' => 'text',
-            'sortingType' => 'alphanumeric',
-        ]], $context);
+        $this->propertyGroupRepository->create([
+            [
+                'id' => $id,
+                'translations' => $translationsPayload,
+                'name' => $defaultName,
+                'displayType' => 'text',
+                'sortingType' => 'alphanumeric',
+            ]
+        ], $context);
 
         $this->propertyGroupCache[$defaultName] = $id;
 
@@ -1277,7 +1304,7 @@ Items:
         }
 
         $id = Uuid::randomHex();
-        
+
         $translationsPayload = [];
         foreach ($translations as $langId => $trans) {
             $translationsPayload[$langId] = [
@@ -1285,12 +1312,14 @@ Items:
             ];
         }
 
-        $this->propertyGroupOptionRepository->create([[
-            'id' => $id,
-            'groupId' => $groupId,
-            'translations' => $translationsPayload,
-            'name' => $defaultName,
-        ]], $context);
+        $this->propertyGroupOptionRepository->create([
+            [
+                'id' => $id,
+                'groupId' => $groupId,
+                'translations' => $translationsPayload,
+                'name' => $defaultName,
+            ]
+        ], $context);
 
         $this->propertyOptionCache[$cacheKey] = $id;
 
@@ -1405,18 +1434,18 @@ Items:
         $charWidth = imagefontwidth($font);
         $charHeight = imagefontheight($font);
         $textWidth = strlen($initials) * $charWidth;
-        
-        imagestring($im, $font, 300 - (int)($textWidth / 2), 290 - (int)($charHeight / 2), $initials, $textCol);
+
+        imagestring($im, $font, 300 - (int) ($textWidth / 2), 290 - (int) ($charHeight / 2), $initials, $textCol);
 
         // Write product name below
         $nameFont = 3;
         $nameWidth = strlen($name) * imagefontwidth($nameFont);
         if ($nameWidth < 360) {
-            imagestring($im, $nameFont, 300 - (int)($nameWidth / 2), 330, $name, $textCol);
+            imagestring($im, $nameFont, 300 - (int) ($nameWidth / 2), 330, $name, $textCol);
         } else {
             $truncatedName = substr($name, 0, 25) . '...';
             $truncWidth = strlen($truncatedName) * imagefontwidth($nameFont);
-            imagestring($im, $nameFont, 300 - (int)($truncWidth / 2), 330, $truncatedName, $textCol);
+            imagestring($im, $nameFont, 300 - (int) ($truncWidth / 2), 330, $truncatedName, $textCol);
         }
 
         ob_start();
@@ -1426,6 +1455,269 @@ Items:
         imagedestroy($im);
 
         return $data;
+    }
+
+    private function generateManufacturers(
+        int $count,
+        ?string $branch,
+        array $activeLanguages,
+        ?string $mediaFolderId,
+        Context $context,
+        bool $generateImages
+    ): array {
+        if ($count <= 0) {
+            return [];
+        }
+
+        $localesList = implode(', ', array_values($activeLanguages));
+        $branchText = !empty(trim((string) $branch)) ? trim((string) $branch) : 'General Retail & E-Commerce';
+
+        $prompt = sprintf(
+            "Generate exactly %d realistic or well-known manufacturer/brand entities suitable for a webshop in the '%s' branch/industry.
+You can use famous existing real-world brands for this industry or invent realistic brand names if needed.
+For each brand provide:
+- 'name': The brand name.
+- 'link': Official brand website URL (e.g. https://www.example-brand.com).
+- 'translations': An object containing translated 'description' strings for each of the following active locales under the locale key: %s. The description MUST be a high-quality brand overview (1-2 detailed paragraphs formatted with HTML <p>...</p> tags).
+- 'logoPrompt': A precise descriptive prompt for generating the brand's logo icon graphic (e.g. 'Clean vector logo for brand name XYZ, minimalist icon, isolated on a pure white background').",
+            $count,
+            $branchText,
+            $localesList
+        );
+
+        $translationProperties = [];
+        foreach (array_values($activeLanguages) as $localeCode) {
+            $translationProperties[$localeCode] = [
+                'type' => 'OBJECT',
+                'properties' => [
+                    'description' => ['type' => 'STRING']
+                ],
+                'required' => ['description']
+            ];
+        }
+
+        $schema = [
+            'type' => 'OBJECT',
+            'properties' => [
+                'manufacturers' => [
+                    'type' => 'ARRAY',
+                    'items' => [
+                        'type' => 'OBJECT',
+                        'properties' => [
+                            'name' => ['type' => 'STRING'],
+                            'link' => ['type' => 'STRING'],
+                            'translations' => [
+                                'type' => 'OBJECT',
+                                'properties' => $translationProperties,
+                                'required' => array_keys($translationProperties)
+                            ],
+                            'logoPrompt' => ['type' => 'STRING']
+                        ],
+                        'required' => ['name', 'link', 'translations', 'logoPrompt']
+                    ]
+                ]
+            ],
+            'required' => ['manufacturers']
+        ];
+
+        try {
+            $jsonText = $this->geminiClient->generateText($prompt, $schema);
+            $data = json_decode($jsonText, true);
+        } catch (\Throwable $e) {
+            $this->logger->error('Gemini Manufacturer generation failed: ' . $e->getMessage());
+            return [];
+        }
+
+        if (!isset($data['manufacturers']) || !is_array($data['manufacturers'])) {
+            $this->logger->warning('Gemini returned invalid manufacturers structure.');
+            return [];
+        }
+
+        $createdIds = [];
+        $defaultLangId = array_key_first($activeLanguages);
+
+        foreach ($data['manufacturers'] as $mItem) {
+            $name = $mItem['name'] ?? null;
+            if (!$name) {
+                continue;
+            }
+
+            $link = $mItem['link'] ?? null;
+            $translationsData = $mItem['translations'] ?? [];
+
+            $translationsPayload = [];
+            foreach ($activeLanguages as $langId => $localeCode) {
+                if (isset($translationsData[$localeCode]['description'])) {
+                    $translationsPayload[$langId] = [
+                        'name' => $name,
+                        'link' => $link,
+                        'description' => $translationsData[$localeCode]['description'],
+                    ];
+                }
+            }
+
+            $defaultDesc = '';
+            if ($defaultLangId && isset($translationsPayload[$defaultLangId]['description'])) {
+                $defaultDesc = $translationsPayload[$defaultLangId]['description'];
+            } elseif (!empty($translationsPayload)) {
+                $firstTrans = reset($translationsPayload);
+                $defaultDesc = $firstTrans['description'] ?? '';
+            }
+
+            $logoPrompt = $mItem['logoPrompt'] ?? sprintf('Clean modern brand logo for %s, vector style, isolated on pure white background', $name);
+            $mediaId = $this->handleManufacturerLogo($name, $logoPrompt, $generateImages, $mediaFolderId, $context);
+
+            $manufacturerId = Uuid::randomHex();
+            $payload = [
+                'id' => $manufacturerId,
+                'name' => $name,
+                'link' => $link,
+                'description' => $defaultDesc,
+                'translations' => $translationsPayload,
+            ];
+
+            if ($mediaId) {
+                $payload['mediaId'] = $mediaId;
+            }
+
+            $this->productManufacturerRepository->create([$payload], $context);
+            $createdIds[] = $manufacturerId;
+        }
+
+        return $createdIds;
+    }
+
+    private function handleManufacturerLogo(
+        string $brandName,
+        string $logoPrompt,
+        bool $generateImages,
+        ?string $mediaFolderId,
+        Context $context
+    ): ?string {
+        $binaryData = null;
+
+        if ($generateImages) {
+            $maxAttempts = 3; // Initial attempt + 2 retries on failure
+            for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+                try {
+                    $prompt = sprintf(
+                        '%s. High quality vector logo mark centered on a crisp solid pure white background, e-commerce brand style, clean edges, isolated on white background.',
+                        $logoPrompt
+                    );
+                    $binaryData = $this->geminiClient->generateImage($prompt);
+                    if (!empty($binaryData)) {
+                        break;
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->warning(sprintf('Gemini Logo Generation attempt %d/%d failed for brand "%s": %s', $attempt, $maxAttempts, $brandName, $e->getMessage()));
+                    if ($attempt === $maxAttempts) {
+                        $binaryData = $this->generatePlaceholderManufacturerLogo($brandName);
+                    }
+                }
+            }
+        } else {
+            $binaryData = $this->generatePlaceholderManufacturerLogo($brandName);
+        }
+
+        if (!$binaryData) {
+            return null;
+        }
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'tdg_logo');
+        file_put_contents($tempFile, $binaryData);
+
+        try {
+            $mediaFile = new MediaFile(
+                $tempFile,
+                'image/png',
+                'png',
+                filesize($tempFile)
+            );
+
+            $mediaId = Uuid::randomHex();
+            $mediaData = [
+                'id' => $mediaId,
+            ];
+            if ($mediaFolderId) {
+                $mediaData['mediaFolderId'] = $mediaFolderId;
+            }
+
+            $this->mediaRepository->create([$mediaData], $context);
+
+            $fileName = 'logo-' . preg_replace('/[^a-z0-9]+/', '-', strtolower($brandName)) . '-' . Uuid::randomHex();
+
+            $this->fileSaver->persistFileToMedia(
+                $mediaFile,
+                $fileName,
+                $mediaId,
+                $context
+            );
+
+            return $mediaId;
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to save brand logo media: ' . $e->getMessage());
+            return null;
+        } finally {
+            if (file_exists($tempFile)) {
+                @unlink($tempFile);
+            }
+        }
+    }
+
+    private function generatePlaceholderManufacturerLogo(string $brandName): string
+    {
+        $width = 500;
+        $height = 500;
+        $im = imagecreatetruecolor($width, $height);
+
+        // Pure white background
+        $white = imagecolorallocate($im, 255, 255, 255);
+        imagefill($im, 0, 0, $white);
+
+        // Dark text & circular accent
+        $dark = imagecolorallocate($im, 30, 30, 30);
+        $accent = imagecolorallocate($im, 80, 80, 80);
+
+        imageellipse($im, 250, 250, 380, 380, $accent);
+        imageellipse($im, 250, 250, 382, 382, $accent);
+
+        // Write initials in center
+        $initials = strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $brandName), 0, 2));
+        if (empty($initials)) {
+            $initials = 'MB';
+        }
+        $font = 5;
+        $charWidth = imagefontwidth($font);
+        $charHeight = imagefontheight($font);
+        $textWidth = strlen($initials) * $charWidth;
+
+        imagestring($im, $font, 250 - (int) ($textWidth / 2), 220 - (int) ($charHeight / 2), $initials, $dark);
+
+        // Write brand name below initials
+        $nameFont = 3;
+        $nameWidth = strlen($brandName) * imagefontwidth($nameFont);
+        if ($nameWidth < 360) {
+            imagestring($im, $nameFont, 250 - (int) ($nameWidth / 2), 280, $brandName, $dark);
+        } else {
+            $truncatedName = substr($brandName, 0, 25) . '...';
+            $truncWidth = strlen($truncatedName) * imagefontwidth($nameFont);
+            imagestring($im, $nameFont, 250 - (int) ($truncWidth / 2), 280, $truncatedName, $dark);
+        }
+
+        ob_start();
+        imagepng($im);
+        $data = ob_get_clean();
+
+        imagedestroy($im);
+
+        return $data;
+    }
+
+    private function getAvailableManufacturerIds(Context $context): array
+    {
+        $criteria = new Criteria();
+        $criteria->setLimit(500);
+        return $this->productManufacturerRepository->searchIds($criteria, $context)->getIds();
     }
 
     private function deleteTestData(Context $context): void
