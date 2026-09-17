@@ -14,11 +14,13 @@ class GeneratorController extends AbstractController
 {
     private MessageBusInterface $messageBus;
     private string $environment;
+    private string $logsDir;
 
-    public function __construct(MessageBusInterface $messageBus, string $environment)
+    public function __construct(MessageBusInterface $messageBus, string $environment, string $logsDir = '')
     {
         $this->messageBus = $messageBus;
         $this->environment = $environment;
+        $this->logsDir = $logsDir;
     }
 
     #[Route(path: '/api/test-data-generator/env', name: 'api.test_data_generator.env', methods: ['GET'])]
@@ -27,6 +29,32 @@ class GeneratorController extends AbstractController
         return new JsonResponse([
             'environment' => $this->environment,
             'isDev' => $this->environment === 'dev',
+        ]);
+    }
+
+    #[Route(path: '/api/test-data-generator/api-log', name: 'api.test_data_generator.api_log', methods: ['GET'], defaults: ['_acl' => ['system.plugin_maintenance']])]
+    public function getApiLog(Request $request): JsonResponse
+    {
+        $logPath = rtrim($this->logsDir, '/') . '/test_data_generator_api.log';
+        if (!file_exists($logPath)) {
+            return new JsonResponse([
+                'exists' => false,
+                'path' => $logPath,
+                'lines' => [],
+            ]);
+        }
+
+        $linesCount = (int) ($request->query->get('lines', 100));
+        $linesCount = max(1, min($linesCount, 1000));
+
+        $file = file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $slice = $file ? array_slice($file, -$linesCount) : [];
+
+        return new JsonResponse([
+            'exists' => true,
+            'path' => $logPath,
+            'size' => filesize($logPath),
+            'lines' => $slice,
         ]);
     }
 

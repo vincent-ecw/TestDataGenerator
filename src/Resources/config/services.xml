@@ -7,6 +7,8 @@
         <!-- Gemini API Client -->
         <service id="TestDataGenerator\Service\GeminiClient" class="TestDataGenerator\Service\GeminiClient">
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
+            <argument type="service" id="logger"/>
+            <argument>%kernel.logs_dir%</argument>
         </service>
 
         <!-- Data Importer Service -->
@@ -38,6 +40,7 @@
         <service id="TestDataGenerator\Controller\GeneratorController" class="TestDataGenerator\Controller\GeneratorController" public="true">
             <argument type="service" id="Symfony\Component\Messenger\MessageBusInterface"/>
             <argument>%kernel.environment%</argument>
+            <argument>%kernel.logs_dir%</argument>
             <call method="setContainer">
                 <argument type="service" id="service_container"/>
             </call>
