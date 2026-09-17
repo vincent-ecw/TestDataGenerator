@@ -5,6 +5,28 @@ All notable changes to the "Gemini Test Data Generator" plugin will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-09-17
+
+### Fixed
+- Include the complete root-to-target category path in product generation prompts so ambiguous names such as Cabinets retain their Office/Furniture context.
+- Resolve ancestor names through DAL parent relationships, including inactive ancestors and newly generated categories without indexed paths. Report missing ancestors and cycles explicitly.
+
+### Added
+- Regression tests for category path ordering, translated names, inactive ancestors, missing parents and cycles.
+
+## [1.0.7] - 2026-09-17
+
+### Changed
+- Documented the test/demo purpose, broad display coverage objective and intentional translation replacement based on the base language.
+- Reassessed the audit: accepted overwrites by design, made channel targeting optional and prioritized deterministic base-language translation.
+- Corrected the README preservation claim and documented current translation limitations. Runtime code is unchanged.
+
+## [1.0.6] - 2026-09-17
+
+### Added
+- Code audit with prioritized findings, source references, verification scope, and a remediation tracker in AUDIT.md.
+- README link to the audit for future adjustments. Runtime code is unchanged.
+
 ## [1.0.5] - 2026-07-23
 
 ### Added

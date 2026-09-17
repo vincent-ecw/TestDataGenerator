@@ -273,6 +273,8 @@ class DataImporter
             }
         }
 
+        $categoryPaths = $this->resolveCategoryPaths(array_column($categories, 'id'), $context);
+
         // Calculate division of products
         $productsPerCategory = (int) floor($productsCount / $categoriesCount);
         if ($productsPerCategory < 1) {
@@ -410,6 +412,8 @@ class DataImporter
 
                 $productPrompt = sprintf(
                     "We are generating products for the category: '%s' (Description: '%s').
+                    Full category path (root to target): %s.
+                    Use the entire category hierarchy to determine the products' purpose and type, not just the target category name.
                     Generate exactly %d products for this category.
                     Make sure products are highly relevant to this category.
                     For each product:
@@ -426,6 +430,7 @@ class DataImporter
                     Ensure that product names, descriptions, and properties match realistically and translations are high quality, natural, and accurately reflect the same information in each language.%s",
                     $category['name'],
                     $category['description'] ?? '',
+                    $categoryPaths[$category['id']],
                     $chunkSize,
                     $localesList,
                     $localesList,
@@ -460,6 +465,55 @@ class DataImporter
                 }
             }
         }
+    }
+
+    /** @return array<string, string> */
+    private function resolveCategoryPaths(array $categoryIds, Context $context): array
+    {
+        $nodes = [];
+        $pending = array_values(array_unique($categoryIds));
+
+        // Resolve parents directly: freshly generated categories need not have an indexed path yet.
+        // Do not filter ancestors by active status; they still provide semantic context.
+        while ($pending !== []) {
+            $entities = $this->categoryRepository->search(new Criteria($pending), $context);
+            foreach ($pending as $id) {
+                $category = $entities->get($id);
+                if ($category === null) {
+                    throw new \RuntimeException(sprintf('Cannot resolve category context: category %s is missing.', $id));
+                }
+                $nodes[$id] = [
+                    'name' => $category->getTranslation('name') ?? $category->getName() ?? '',
+                    'parentId' => $category->getParentId(),
+                ];
+            }
+
+            $pending = [];
+            foreach ($nodes as $node) {
+                if ($node['parentId'] !== null && !isset($nodes[$node['parentId']])) {
+                    $pending[] = $node['parentId'];
+                }
+            }
+            $pending = array_values(array_unique($pending));
+        }
+
+        $paths = [];
+        foreach ($categoryIds as $id) {
+            $names = [];
+            $visited = [];
+            for ($current = $id; $current !== null; $current = $nodes[$current]['parentId']) {
+                if (isset($visited[$current])) {
+                    throw new \RuntimeException('Cannot resolve category context: circular category hierarchy.');
+                }
+                $visited[$current] = true;
+                if (trim($nodes[$current]['name']) !== '') {
+                    $names[] = $nodes[$current]['name'];
+                }
+            }
+            $paths[$id] = implode(' > ', array_reverse($names));
+        }
+
+        return $paths;
     }
 
     private function importSingleProduct(
